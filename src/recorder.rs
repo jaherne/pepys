@@ -40,15 +40,29 @@ pub fn generate_bash_integration() -> String {
 _pepys_command=""
 _pepys_start_time=0
 
+# Get current time in milliseconds (cross-platform)
+_pepys_get_time_ms() {
+    # Try different methods depending on OS
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS: use python or perl as fallback
+        python3 -c 'import time; print(int(time.time() * 1000))' || \
+        perl -MTime::HiRes=time -e 'printf("%.0f\n", time() * 1000)' || \
+        echo $(($(date +%s) * 1000))
+    else
+        # Linux: use date with nanoseconds
+        echo $(($(date +%s%N) / 1000000))
+    fi
+}
+
 _pepys_preexec() {
     _pepys_command="$1"
-    _pepys_start_time=$(date +%s%3N)
+    _pepys_start_time=$(_pepys_get_time_ms)
 }
 
 _pepys_precmd() {
     local exit_code=$?
     if [ -n "$_pepys_command" ]; then
-        local end_time=$(date +%s%3N)
+        local end_time=$(_pepys_get_time_ms)
         local duration=$(( end_time - _pepys_start_time ))
 
         # Record the command
@@ -83,15 +97,29 @@ pub fn generate_zsh_integration() -> String {
 _pepys_command=""
 _pepys_start_time=0
 
+# Get current time in milliseconds (cross-platform)
+_pepys_get_time_ms() {
+    # Try different methods depending on OS
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS: use python or perl as fallback
+        python3 -c 'import time; print(int(time.time() * 1000))' || \
+        perl -MTime::HiRes=time -e 'printf("%.0f\n", time() * 1000)' || \
+        echo $(($(date +%s) * 1000))
+    else
+        # Linux: use date with nanoseconds
+        echo $(($(date +%s%N) / 1000000))
+    fi
+}
+
 pepys_preexec() {
     _pepys_command="$1"
-    _pepys_start_time=$(date +%s%3N)
+    _pepys_start_time=$(_pepys_get_time_ms)
 }
 
 pepys_precmd() {
     local exit_code=$?
-    if [ -n "$_pepys_command" ]; then
-        local end_time=$(date +%s%3N)
+    if [[ -n "$_pepys_command" ]]; then
+        local end_time=$(_pepys_get_time_ms)
         local duration=$(( end_time - _pepys_start_time ))
 
         # Record the command
