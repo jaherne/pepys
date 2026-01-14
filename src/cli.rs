@@ -1,0 +1,90 @@
+use clap::{Parser, Subcommand};
+
+#[derive(Parser)]
+#[command(name = "pepys")]
+#[command(version, about = "A command history tool that records shell commands with metadata", long_about = None)]
+pub struct Cli {
+    #[command(subcommand)]
+    pub command: Commands,
+}
+
+#[derive(Subcommand)]
+pub enum Commands {
+    /// Record a command execution
+    Record {
+        /// The command that was executed
+        #[arg(short, long)]
+        command: String,
+
+        /// Exit code of the command
+        #[arg(short, long)]
+        exit_code: i32,
+
+        /// Duration in milliseconds
+        #[arg(short, long)]
+        duration_ms: i64,
+
+        /// Working directory where the command was executed
+        #[arg(short, long)]
+        working_directory: Option<String>,
+
+        /// Output of the command (optional)
+        #[arg(short, long)]
+        output: Option<String>,
+    },
+
+    /// Browse command history in an interactive TUI
+    Browse {
+        /// Number of recent commands to load initially
+        #[arg(short, long, default_value = "1000")]
+        limit: usize,
+    },
+
+    /// List recent commands
+    List {
+        /// Number of commands to show
+        #[arg(short, long, default_value = "20")]
+        limit: usize,
+    },
+
+    /// Add or update annotation for a command
+    Annotate {
+        /// ID of the command to annotate
+        id: i64,
+
+        /// Annotation text
+        annotation: String,
+    },
+
+    /// Export commands to a bash script
+    ExportScript {
+        /// IDs of commands to export
+        #[arg(required = true)]
+        ids: Vec<i64>,
+
+        /// Output file path
+        #[arg(short, long)]
+        output: String,
+    },
+
+    /// Export commands to markdown
+    ExportMarkdown {
+        /// IDs of commands to export
+        #[arg(required = true)]
+        ids: Vec<i64>,
+
+        /// Output file path
+        #[arg(short, long)]
+        output: String,
+    },
+
+    /// Show statistics about command history
+    Stats,
+
+    /// Initialize shell integration (prints shell script to stdout)
+    Init {
+        /// Shell type (bash, zsh)
+        #[arg(short, long, default_value = "bash")]
+        shell: String,
+    },
+}

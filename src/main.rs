@@ -1,0 +1,155 @@
+mod cli;
+mod export;
+mod models;
+mod recorder;
+mod storage;
+mod tui;
+
+use anyhow::{Context, Result};
+use clap::Parser;
+use cli::{Cli, Commands};
+use export::Exporter;
+use recorder::{generate_bash_integration, generate_zsh_integration, Recorder};
+use storage::Storage;
+use std::path::PathBuf;
+
+fn get_db_path() -> Result<PathBuf> {
+    let data_dir = dirs::data_dir()
+        .context("Failed to determine data directory")?
+        .join("pepys");
+
+    std::fs::create_dir_all(&data_dir)
+        .with_context(|| format!("Failed to create data directory: {:?}", data_dir))?;
+
+    Ok(data_dir.join("history.db"))
+}
+
+fn main() -> Result<()> {
+    let cli = Cli::parse();
+    let db_path = get_db_path()?;
+    let storage = Storage::new(db_path)?;
+
+    match cli.command {
+        Commands::Record {
+            command,
+            exit_code,
+            duration_ms,
+            working_directory,
+            output,
+        } => {
+            let recorder = Recorder::new(storage);
+            recorder.record(command, exit_code, duration_ms, working_directory, output)?;
+        }
+
+        Commands::Browse { limit } => {
+            let mut app = tui::App::new(storage, limit)?;
+            app.run()?;
+        }
+
+        Commands::List { limit } => {
+            let commands = storage.get_recent(limit)?;
+
+            println!("\nRecent Commands:");
+            println!("{}", "=".repeat(80));
+
+            for cmd in commands {
+                println!(
+                    "{} [{}] {} - {} ({})",
+                    cmd.status_symbol(),
+                    cmd.timestamp.format("%Y-%m-%d %H:%M:%S"),
+                    cmd.command,
+                    cmd.duration_human_readable(),
+                    cmd.working_directory
+                );
+                if let Some(annotation) = &cmd.annotation {
+                    println!("    Note: {}", annotation);
+                }
+            }
+        }
+
+        Commands::Annotate { id, annotation } => {
+            storage.update_annotation(id, Some(annotation.clone()))?;
+            println!("✓ Added annotation to command #{}", id);
+        }
+
+        Commands::ExportScript { ids, output } => {
+            let mut records = Vec::new();
+            for id in ids {
+                if let Some(record) = storage.get(id)? {
+                    records.push(record);
+                } else {
+                    eprintln!("Warning: Command #{} not found", id);
+                }
+            }
+
+            Exporter::export_bash_script(&records, &output)?;
+            println!("✓ Exported {} commands to {}", records.len(), output);
+        }
+
+        Commands::ExportMarkdown { ids, output } => {
+            let mut records = Vec::new();
+            for id in ids {
+                if let Some(record) = storage.get(id)? {
+                    records.push(record);
+                } else {
+                    eprintln!("Warning: Command #{} not found", id);
+                }
+            }
+
+            Exporter::export_markdown(&records, &output)?;
+            println!("✓ Exported {} commands to {}", records.len(), output);
+        }
+
+        Commands::Stats => {
+            let total = storage.count()?;
+            let commands = storage.get_all()?;
+
+            let successful = commands.iter().filter(|c| c.exit_code == 0).count();
+            let failed = total - successful;
+
+            let total_duration_ms: i64 = commands.iter().map(|c| c.duration_ms).sum();
+            let avg_duration_ms = if total > 0 {
+                total_duration_ms / total as i64
+            } else {
+                0
+            };
+
+            println!("\nCommand History Statistics:");
+            println!("{}", "=".repeat(80));
+            println!("Total commands: {}", total);
+            println!("Successful: {} ({:.1}%)", successful, (successful as f64 / total as f64) * 100.0);
+            println!("Failed: {} ({:.1}%)", failed, (failed as f64 / total as f64) * 100.0);
+            println!("Average duration: {}ms", avg_duration_ms);
+
+            if let Some(longest) = commands.iter().max_by_key(|c| c.duration_ms) {
+                println!("\nLongest command:");
+                println!("  {}", longest.command);
+                println!("  Duration: {}", longest.duration_human_readable());
+            }
+
+            if let Some(latest) = commands.first() {
+                println!("\nMost recent command:");
+                println!("  {}", latest.command);
+                println!("  {} - {}", latest.timestamp.format("%Y-%m-%d %H:%M:%S"), latest.status_symbol());
+            }
+        }
+
+        Commands::Init { shell } => {
+            let script = match shell.as_str() {
+                "bash" => generate_bash_integration(),
+                "zsh" => generate_zsh_integration(),
+                _ => {
+                    eprintln!("Unsupported shell: {}", shell);
+                    eprintln!("Supported shells: bash, zsh");
+                    std::process::exit(1);
+                }
+            };
+
+            println!("{}", script);
+            eprintln!("\n# To enable pepys integration, add this to your shell config:");
+            eprintln!("# eval \"$(pepys init --shell {})\"", shell);
+        }
+    }
+
+    Ok(())
+}
