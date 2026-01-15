@@ -90,6 +90,9 @@ impl App {
                         KeyCode::Down | KeyCode::Char('j') => self.next(),
                         KeyCode::Up | KeyCode::Char('k') => self.previous(),
                         KeyCode::Char(' ') => self.toggle_selection(),
+                        KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            self.select_all()
+                        }
                         KeyCode::Char('a') => self.annotate_selected()?,
                         KeyCode::Char('d') => self.show_delete_confirm = true,
                         // Because we're nice we'll handle ctrl-c too
@@ -250,6 +253,7 @@ impl App {
             Line::from("  ↑/k       - Move up"),
             Line::from("  ↓/j       - Move down"),
             Line::from("  Space     - Toggle selection"),
+            Line::from("  Ctrl-A    - Select all commands"),
             Line::from("  a         - Annotate selected command"),
             Line::from("  d         - Delete selected command"),
             Line::from("  ?         - Toggle this help"),
@@ -314,6 +318,16 @@ impl App {
         }
     }
 
+    fn select_all(&mut self) {
+        // Select all commands
+        self.selected_ids.clear();
+        for cmd in &self.commands {
+            if let Some(id) = cmd.id {
+                self.selected_ids.push(id);
+            }
+        }
+    }
+
     fn annotate_selected(&mut self) -> Result<()> {
         // In a real implementation, this would open a text input dialog
         // For now, we'll skip this functionality in the TUI
@@ -322,32 +336,43 @@ impl App {
     }
 
     fn render_delete_confirm(&self, f: &mut Frame) {
-        let selected = self.list_state.selected();
-        let command_text = if let Some(idx) = selected {
-            if let Some(cmd) = self.commands.get(idx) {
-                // Truncate long commands to fit better
-                if cmd.command.len() > 60 {
-                    format!("{}...", &cmd.command[..57])
+        let delete_count = if self.selected_ids.is_empty() {
+            1
+        } else {
+            self.selected_ids.len()
+        };
+
+        let message = if delete_count == 1 {
+            let selected = self.list_state.selected();
+            let command_text = if let Some(idx) = selected {
+                if let Some(cmd) = self.commands.get(idx) {
+                    // Truncate long commands to fit better
+                    if cmd.command.len() > 60 {
+                        format!("{}...", &cmd.command[..57])
+                    } else {
+                        cmd.command.clone()
+                    }
                 } else {
-                    cmd.command.clone()
+                    "unknown command".to_string()
                 }
             } else {
                 "unknown command".to_string()
-            }
+            };
+            format!("Delete this command?\n\n{}", command_text)
         } else {
-            "unknown command".to_string()
+            format!("Delete {} selected commands?", delete_count)
         };
 
         let text = Text::from(vec![
             Line::from(Span::styled(
-                "Delete this command?",
+                message.lines().next().unwrap_or("Delete?"),
                 Style::default()
                     .add_modifier(Modifier::BOLD)
                     .fg(Color::Red),
             )),
             Line::from(""),
             Line::from(Span::styled(
-                command_text,
+                message.lines().skip(2).next().unwrap_or(""),
                 Style::default().add_modifier(Modifier::BOLD),
             )),
             Line::from(""),
@@ -379,16 +404,49 @@ impl App {
     }
 
     fn delete_confirmed(&mut self) -> Result<()> {
-        if let Some(idx) = self.list_state.selected() {
-            if let Some(cmd) = self.commands.get(idx) {
-                let id = cmd.id.unwrap_or(0);
-                self.storage.delete(id)?;
-                self.commands.remove(idx);
+        if self.selected_ids.is_empty() {
+            // No selections - delete current line only
+            if let Some(idx) = self.list_state.selected() {
+                if let Some(cmd) = self.commands.get(idx) {
+                    let id = cmd.id.unwrap_or(0);
+                    self.storage.delete(id)?;
+                    self.commands.remove(idx);
 
-                // Adjust selection
-                if self.commands.is_empty() {
-                    self.list_state.select(None);
-                } else if idx >= self.commands.len() {
+                    // Adjust selection
+                    if self.commands.is_empty() {
+                        self.list_state.select(None);
+                    } else if idx >= self.commands.len() {
+                        self.list_state.select(Some(self.commands.len() - 1));
+                    }
+                }
+            }
+        } else {
+            // Delete all selected items
+            let ids_to_delete = self.selected_ids.clone();
+
+            // Delete from storage
+            for id in &ids_to_delete {
+                self.storage.delete(*id)?;
+            }
+
+            // Remove from commands list (iterate in reverse to maintain indices)
+            let mut removed_count = 0;
+            self.commands.retain(|cmd| {
+                let should_keep = !ids_to_delete.contains(&cmd.id.unwrap_or(0));
+                if !should_keep {
+                    removed_count += 1;
+                }
+                should_keep
+            });
+
+            // Clear the selection list
+            self.selected_ids.clear();
+
+            // Adjust the current selection
+            if self.commands.is_empty() {
+                self.list_state.select(None);
+            } else if let Some(current_idx) = self.list_state.selected() {
+                if current_idx >= self.commands.len() {
                     self.list_state.select(Some(self.commands.len() - 1));
                 }
             }

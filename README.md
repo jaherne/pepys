@@ -53,12 +53,30 @@ eval "$(pepys init --shell zsh)"
 
 ## Usage
 
-### Recording Commands
+### Command Recording
 
-Once shell integration is enabled, pepys automatically records all commands. You can also manually record a command:
+Once shell integration is enabled, pepys automatically records all commands.
+
+### Output Recording (WIP)
+
+Run the `pepys record` command to enable/disable recording the output of shell commands:
 
 ```bash
-pepys record --command "echo hello" --exit-code 0 --duration-ms 150
+pepys record
+```
+
+When enabled, you'll see a red **[●]** indicator in your prompt. When visible, pepys is recording the output of all commands you run!
+
+Note that this can include sensitive info, such as if you run `cat /etc/shadow`. Be careful, or delete commands from your history with sensitive outputs. 
+
+Output recording is **disabled by default**.
+
+### Manual Command Entry
+
+You can manually add a command to history:
+
+```bash
+pepys add --command "echo hello" --exit-code 0 --duration-ms 150
 ```
 
 ### Browsing History
@@ -119,3 +137,8 @@ The following features are planned for future releases:
   - Search for previous commands based on duration, execution status, executing user, etc
 - **Cloud Sync**: Synchronize history across machines and users
 - **Output Capture**: Configurable automatic capture of command output
+
+## FAQs
+### Is this a audit tool? 
+
+No, this is meant for personal consumption. No guarantees are made about data safety, and there's no way to prevent a user from deleting their own data. Do not rely on this for legal auditing.

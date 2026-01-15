@@ -39,6 +39,7 @@ pub fn generate_bash_integration() -> String {
 
 _pepys_command=""
 _pepys_start_time=0
+_pepys_original_ps1="$PS1"
 
 # Get current time in milliseconds (cross-platform)
 _pepys_get_time_ms() {
@@ -54,6 +55,27 @@ _pepys_get_time_ms() {
     fi
 }
 
+# Get pepys data directory
+_pepys_get_data_dir() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "$HOME/Library/Application Support/pepys"
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        echo "${XDG_DATA_HOME:-$HOME/.local/share}/pepys"
+    else
+        echo "$HOME/.local/share/pepys"
+    fi
+}
+
+# Update prompt with recording indicator
+_pepys_update_prompt() {
+    local data_dir=$(_pepys_get_data_dir)
+    if [ -f "$data_dir/recording_enabled" ]; then
+        PS1="\[\033[0;31m\]●\[\033[0m\] $_pepys_original_ps1"
+    else
+        PS1="$_pepys_original_ps1"
+    fi
+}
+
 _pepys_preexec() {
     _pepys_command="$1"
     _pepys_start_time=$(_pepys_get_time_ms)
@@ -61,12 +83,16 @@ _pepys_preexec() {
 
 _pepys_precmd() {
     local exit_code=$?
+
+    # Update prompt indicator
+    _pepys_update_prompt
+
     if [ -n "$_pepys_command" ]; then
         local end_time=$(_pepys_get_time_ms)
         local duration=$(( end_time - _pepys_start_time ))
 
-        # Record the command
-        pepys record \
+        # Always record the command
+        pepys add \
             --command "$_pepys_command" \
             --exit-code $exit_code \
             --duration-ms $duration \
@@ -111,6 +137,25 @@ _pepys_get_time_ms() {
     fi
 }
 
+# Get pepys data directory
+_pepys_get_data_dir() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "$HOME/Library/Application Support/pepys"
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        echo "${XDG_DATA_HOME:-$HOME/.local/share}/pepys"
+    else
+        echo "$HOME/.local/share/pepys"
+    fi
+}
+
+# Get recording indicator for prompt
+_pepys_prompt_indicator() {
+    local data_dir=$(_pepys_get_data_dir)
+    if [[ -f "$data_dir/recording_enabled" ]]; then
+        echo "%F{red}[●]%f "
+    fi
+}
+
 pepys_preexec() {
     _pepys_command="$1"
     _pepys_start_time=$(_pepys_get_time_ms)
@@ -118,12 +163,13 @@ pepys_preexec() {
 
 pepys_precmd() {
     local exit_code=$?
+
     if [[ -n "$_pepys_command" ]]; then
         local end_time=$(_pepys_get_time_ms)
         local duration=$(( end_time - _pepys_start_time ))
 
-        # Record the command
-        pepys record \
+        # Always record the command
+        pepys add \
             --command "$_pepys_command" \
             --exit-code $exit_code \
             --duration-ms $duration \
@@ -132,6 +178,11 @@ pepys_precmd() {
         _pepys_command=""
     fi
 }
+
+# Set up prompt with recording indicator (appended to the end)
+# This uses command substitution that runs every time the prompt is displayed
+setopt PROMPT_SUBST
+PROMPT="$PROMPT"'$(_pepys_prompt_indicator)'
 
 # Install hooks
 autoload -Uz add-zsh-hook

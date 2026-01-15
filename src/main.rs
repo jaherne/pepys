@@ -14,6 +14,11 @@ use storage::Storage;
 use std::path::PathBuf;
 
 fn get_db_path() -> Result<PathBuf> {
+    let data_dir = get_data_dir()?;
+    Ok(data_dir.join("history.db"))
+}
+
+fn get_data_dir() -> Result<PathBuf> {
     let data_dir = dirs::data_dir()
         .context("Failed to determine data directory")?
         .join("pepys");
@@ -21,7 +26,12 @@ fn get_db_path() -> Result<PathBuf> {
     std::fs::create_dir_all(&data_dir)
         .with_context(|| format!("Failed to create data directory: {:?}", data_dir))?;
 
-    Ok(data_dir.join("history.db"))
+    Ok(data_dir)
+}
+
+fn get_recording_state_path() -> Result<PathBuf> {
+    let data_dir = get_data_dir()?;
+    Ok(data_dir.join("recording_enabled"))
 }
 
 fn main() -> Result<()> {
@@ -30,7 +40,7 @@ fn main() -> Result<()> {
     let storage = Storage::new(db_path)?;
 
     match cli.command {
-        Commands::Record {
+        Commands::Add {
             command,
             exit_code,
             duration_ms,
@@ -39,6 +49,23 @@ fn main() -> Result<()> {
         } => {
             let recorder = Recorder::new(storage);
             recorder.record(command, exit_code, duration_ms, working_directory, output)?;
+        }
+
+        Commands::Record => {
+            let state_path = get_recording_state_path()?;
+            let is_enabled = state_path.exists();
+
+            if is_enabled {
+                // Disable recording
+                std::fs::remove_file(&state_path)
+                    .with_context(|| format!("Failed to remove state file: {:?}", state_path))?;
+                println!("Recording disabled");
+            } else {
+                // Enable recording
+                std::fs::write(&state_path, "")
+                    .with_context(|| format!("Failed to create state file: {:?}", state_path))?;
+                println!("Recording enabled");
+            }
         }
 
         Commands::Browse { limit } => {

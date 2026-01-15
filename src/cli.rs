@@ -10,8 +10,8 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Record a command execution
-    Record {
+    /// Add a command execution to history
+    Add {
         /// The command that was executed
         #[arg(short, long)]
         command: String,
@@ -32,6 +32,9 @@ pub enum Commands {
         #[arg(short, long)]
         output: Option<String>,
     },
+
+    /// Toggle command output recording on/off
+    Record,
 
     /// Browse command history in an interactive TUI
     Browse {
