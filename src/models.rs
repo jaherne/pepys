@@ -11,7 +11,6 @@ pub struct CommandRecord {
     pub timestamp: DateTime<Utc>,
     pub working_directory: String,
     pub output: Option<String>,
-    pub annotation: Option<String>,
 }
 
 impl CommandRecord {
@@ -30,14 +29,7 @@ impl CommandRecord {
             timestamp: Utc::now(),
             working_directory,
             output,
-            annotation: None,
         }
-    }
-
-    #[allow(dead_code)]
-    pub fn with_annotation(mut self, annotation: String) -> Self {
-        self.annotation = Some(annotation);
-        self
     }
 
     pub fn duration_human_readable(&self) -> String {

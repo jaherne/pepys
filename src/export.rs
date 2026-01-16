@@ -1,4 +1,5 @@
 use crate::models::CommandRecord;
+use crate::storage::Storage;
 use anyhow::{Context, Result};
 use std::fs::File;
 use std::io::Write;
@@ -7,7 +8,11 @@ pub struct Exporter;
 
 impl Exporter {
     /// Export commands as a bash script
-    pub fn export_bash_script(records: &[CommandRecord], output_path: &str) -> Result<()> {
+    pub fn export_bash_script(
+        records: &[CommandRecord],
+        output_path: &str,
+        storage: &Storage,
+    ) -> Result<()> {
         let mut file = File::create(output_path)
             .with_context(|| format!("Failed to create file: {}", output_path))?;
 
@@ -16,7 +21,7 @@ impl Exporter {
         writeln!(file)?;
 
         for record in records {
-            if let Some(annotation) = &record.annotation {
+            if let Some(annotation) = storage.get_annotation_for_command(&record.command)? {
                 writeln!(file, "# {}", annotation)?;
             }
             writeln!(file, "# Executed at: {}", record.timestamp)?;
@@ -34,7 +39,11 @@ impl Exporter {
     }
 
     /// Export commands as markdown
-    pub fn export_markdown(records: &[CommandRecord], output_path: &str) -> Result<()> {
+    pub fn export_markdown(
+        records: &[CommandRecord],
+        output_path: &str,
+        storage: &Storage,
+    ) -> Result<()> {
         let mut file = File::create(output_path)
             .with_context(|| format!("Failed to create file: {}", output_path))?;
 
@@ -57,7 +66,7 @@ impl Exporter {
             writeln!(file, "**Timestamp:** {}", record.timestamp)?;
             writeln!(file, "**Directory:** `{}`", record.working_directory)?;
 
-            if let Some(annotation) = &record.annotation {
+            if let Some(annotation) = storage.get_annotation_for_command(&record.command)? {
                 writeln!(file)?;
                 writeln!(file, "**Note:**")?;
                 writeln!(file, "{}", annotation)?;
@@ -87,14 +96,19 @@ mod tests {
 
     #[test]
     fn test_export_bash_script() -> Result<()> {
+        let db_file = NamedTempFile::new()?;
+        let storage = Storage::new(db_file.path().to_path_buf())?;
+
         let records = vec![
             CommandRecord::new("echo hello".to_string(), 0, 100, "/tmp".to_string(), None),
-            CommandRecord::new("ls -la".to_string(), 0, 150, "/tmp".to_string(), None)
-                .with_annotation("List files".to_string()),
+            CommandRecord::new("ls -la".to_string(), 0, 150, "/tmp".to_string(), None),
         ];
 
+        // Add an annotation for ls -la
+        storage.set_annotation_for_command("ls -la", Some("List files".to_string()))?;
+
         let temp_file = NamedTempFile::new()?;
-        Exporter::export_bash_script(&records, temp_file.path().to_str().unwrap())?;
+        Exporter::export_bash_script(&records, temp_file.path().to_str().unwrap(), &storage)?;
 
         let content = std::fs::read_to_string(temp_file.path())?;
         assert!(content.contains("#!/bin/bash"));
@@ -107,6 +121,9 @@ mod tests {
 
     #[test]
     fn test_export_markdown() -> Result<()> {
+        let db_file = NamedTempFile::new()?;
+        let storage = Storage::new(db_file.path().to_path_buf())?;
+
         let records = vec![CommandRecord::new(
             "echo test".to_string(),
             0,
@@ -116,7 +133,7 @@ mod tests {
         )];
 
         let temp_file = NamedTempFile::new()?;
-        Exporter::export_markdown(&records, temp_file.path().to_str().unwrap())?;
+        Exporter::export_markdown(&records, temp_file.path().to_str().unwrap(), &storage)?;
 
         let content = std::fs::read_to_string(temp_file.path())?;
         assert!(content.contains("# Command History Export"));

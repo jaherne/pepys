@@ -88,15 +88,20 @@ fn main() -> Result<()> {
                     cmd.duration_human_readable(),
                     cmd.working_directory
                 );
-                if let Some(annotation) = &cmd.annotation {
+                if let Some(annotation) = storage.get_annotation_for_command(&cmd.command)? {
                     println!("    Note: {}", annotation);
                 }
             }
         }
 
         Commands::Annotate { id, annotation } => {
-            storage.update_annotation(id, Some(annotation.clone()))?;
-            println!("✓ Added annotation to command #{}", id);
+            if let Some(cmd) = storage.get(id)? {
+                storage.set_annotation_for_command(&cmd.command, Some(annotation.clone()))?;
+                println!("✓ Added annotation to command: {}", cmd.command);
+            } else {
+                eprintln!("Command #{} not found", id);
+                std::process::exit(1);
+            }
         }
 
         Commands::ExportScript { ids, output } => {
@@ -109,7 +114,7 @@ fn main() -> Result<()> {
                 }
             }
 
-            Exporter::export_bash_script(&records, &output)?;
+            Exporter::export_bash_script(&records, &output, &storage)?;
             println!("✓ Exported {} commands to {}", records.len(), output);
         }
 
@@ -123,7 +128,7 @@ fn main() -> Result<()> {
                 }
             }
 
-            Exporter::export_markdown(&records, &output)?;
+            Exporter::export_markdown(&records, &output, &storage)?;
             println!("✓ Exported {} commands to {}", records.len(), output);
         }
 

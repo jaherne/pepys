@@ -29,8 +29,15 @@ impl Storage {
                 duration_ms INTEGER NOT NULL,
                 timestamp TEXT NOT NULL,
                 working_directory TEXT NOT NULL,
-                output TEXT,
-                annotation TEXT
+                output TEXT
+            )",
+            [],
+        )?;
+
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS command_annotations (
+                command TEXT PRIMARY KEY,
+                annotation TEXT NOT NULL
             )",
             [],
         )?;
@@ -57,8 +64,8 @@ impl Storage {
     /// Insert a new command record
     pub fn insert(&self, record: &CommandRecord) -> Result<i64> {
         self.conn.execute(
-            "INSERT INTO commands (command, exit_code, duration_ms, timestamp, working_directory, output, annotation)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO commands (command, exit_code, duration_ms, timestamp, working_directory, output)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
                 record.command,
                 record.exit_code,
@@ -66,7 +73,6 @@ impl Storage {
                 record.timestamp.to_rfc3339(),
                 record.working_directory,
                 record.output,
-                record.annotation,
             ],
         )?;
 
@@ -76,7 +82,7 @@ impl Storage {
     /// Get a command record by ID
     pub fn get(&self, id: i64) -> Result<Option<CommandRecord>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, command, exit_code, duration_ms, timestamp, working_directory, output, annotation
+            "SELECT id, command, exit_code, duration_ms, timestamp, working_directory, output
              FROM commands WHERE id = ?1",
         )?;
 
@@ -92,7 +98,7 @@ impl Storage {
     /// Get all command records, ordered by timestamp (most recent first)
     pub fn get_all(&self) -> Result<Vec<CommandRecord>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, command, exit_code, duration_ms, timestamp, working_directory, output, annotation
+            "SELECT id, command, exit_code, duration_ms, timestamp, working_directory, output
              FROM commands ORDER BY timestamp DESC",
         )?;
 
@@ -109,7 +115,7 @@ impl Storage {
     /// Get the most recent N command records
     pub fn get_recent(&self, limit: usize) -> Result<Vec<CommandRecord>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, command, exit_code, duration_ms, timestamp, working_directory, output, annotation
+            "SELECT id, command, exit_code, duration_ms, timestamp, working_directory, output
              FROM commands ORDER BY timestamp DESC LIMIT ?1",
         )?;
 
@@ -123,12 +129,37 @@ impl Storage {
         Ok(records)
     }
 
-    /// Update the annotation for a command record
-    pub fn update_annotation(&self, id: i64, annotation: Option<String>) -> Result<()> {
-        self.conn.execute(
-            "UPDATE commands SET annotation = ?1 WHERE id = ?2",
-            params![annotation, id],
-        )?;
+    /// Get annotation for a command text
+    pub fn get_annotation_for_command(&self, command: &str) -> Result<Option<String>> {
+        let result = self.conn.query_row(
+            "SELECT annotation FROM command_annotations WHERE command = ?1",
+            params![command],
+            |row| row.get(0),
+        );
+
+        match result {
+            Ok(annotation) => Ok(Some(annotation)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Set annotation for a command text
+    pub fn set_annotation_for_command(&self, command: &str, annotation: Option<String>) -> Result<()> {
+        match annotation {
+            Some(text) if !text.is_empty() => {
+                self.conn.execute(
+                    "INSERT OR REPLACE INTO command_annotations (command, annotation) VALUES (?1, ?2)",
+                    params![command, text],
+                )?;
+            }
+            _ => {
+                self.conn.execute(
+                    "DELETE FROM command_annotations WHERE command = ?1",
+                    params![command],
+                )?;
+            }
+        }
         Ok(())
     }
 
@@ -161,7 +192,6 @@ impl Storage {
             timestamp,
             working_directory: row.get(5)?,
             output: row.get(6)?,
-            annotation: row.get(7)?,
         })
     }
 }
@@ -194,10 +224,19 @@ mod tests {
         assert_eq!(retrieved.exit_code, 0);
         assert_eq!(retrieved.duration_ms, 150);
 
-        // Update annotation
-        storage.update_annotation(id, Some("test annotation".to_string()))?;
-        let updated = storage.get(id)?.unwrap();
-        assert_eq!(updated.annotation, Some("test annotation".to_string()));
+        // Test command annotations
+        storage.set_annotation_for_command("ls -la", Some("test annotation".to_string()))?;
+        let annotation = storage.get_annotation_for_command("ls -la")?;
+        assert_eq!(annotation, Some("test annotation".to_string()));
+
+        // Different command should have no annotation
+        let no_annotation = storage.get_annotation_for_command("ls")?;
+        assert_eq!(no_annotation, None);
+
+        // Clear annotation
+        storage.set_annotation_for_command("ls -la", None)?;
+        let cleared = storage.get_annotation_for_command("ls -la")?;
+        assert_eq!(cleared, None);
 
         // Count
         assert_eq!(storage.count()?, 1);

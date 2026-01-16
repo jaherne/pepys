@@ -244,13 +244,13 @@ impl App {
                     ]),
                 ];
 
-                if let Some(annotation) = &cmd.annotation {
+                if let Ok(Some(annotation)) = self.storage.get_annotation_for_command(&cmd.command) {
                     lines.push(Line::from(""));
                     lines.push(Line::from(vec![Span::styled(
                         "Note:",
                         Style::default().add_modifier(Modifier::BOLD),
                     )]));
-                    lines.push(Line::from(annotation.as_str()));
+                    lines.push(Line::from(annotation));
                 }
 
                 Text::from(lines)
@@ -360,7 +360,10 @@ impl App {
         if let Some(idx) = self.list_state.selected() {
             if let Some(cmd) = self.commands.get(idx) {
                 // Pre-fill with existing annotation if present
-                self.annotation_input = cmd.annotation.clone().unwrap_or_default();
+                self.annotation_input = self
+                    .storage
+                    .get_annotation_for_command(&cmd.command)?
+                    .unwrap_or_default();
                 self.annotating_idx = Some(idx);
                 self.show_annotate = true;
             }
@@ -370,16 +373,14 @@ impl App {
 
     fn save_annotation(&mut self) -> Result<()> {
         if let Some(idx) = self.annotating_idx {
-            if let Some(cmd) = self.commands.get_mut(idx) {
-                if let Some(id) = cmd.id {
-                    let annotation = if self.annotation_input.is_empty() {
-                        None
-                    } else {
-                        Some(self.annotation_input.clone())
-                    };
-                    self.storage.update_annotation(id, annotation.clone())?;
-                    cmd.annotation = annotation;
-                }
+            if let Some(cmd) = self.commands.get(idx) {
+                let annotation = if self.annotation_input.is_empty() {
+                    None
+                } else {
+                    Some(self.annotation_input.clone())
+                };
+                self.storage
+                    .set_annotation_for_command(&cmd.command, annotation)?;
             }
         }
         self.show_annotate = false;
