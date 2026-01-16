@@ -1,10 +1,14 @@
 [package]
 name = "pepys"
 version = "0.1.0"
-edition = "2021"
-authors = ["pepys contributors"]
+edition = "2024"
+authors = ["jonathan aherne"]
 description = "A command history tool that records shell commands with metadata"
 license = "MIT"
+homepage = "https://github.com/jaherne/pepys"
+repository = "https://github.com/jaherne/pepys/"
+documentation = "https://github.com/jaherne/pepys/"
+exclude = ["install.sh"]
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
