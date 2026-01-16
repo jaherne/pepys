@@ -23,6 +23,9 @@ pub struct App {
     selected_ids: Vec<i64>,
     show_help: bool,
     show_delete_confirm: bool,
+    show_annotate: bool,
+    annotation_input: String,
+    annotating_idx: Option<usize>,
 }
 
 impl App {
@@ -40,6 +43,9 @@ impl App {
             selected_ids: Vec::new(),
             show_help: false,
             show_delete_confirm: false,
+            show_annotate: false,
+            annotation_input: String::new(),
+            annotating_idx: None,
         })
     }
 
@@ -70,7 +76,26 @@ impl App {
             terminal.draw(|f| self.ui(f))?;
 
             if let Event::Key(key) = event::read()? {
-                if self.show_delete_confirm {
+                if self.show_annotate {
+                    // Handle annotation input
+                    match key.code {
+                        KeyCode::Enter => {
+                            self.save_annotation()?;
+                        }
+                        KeyCode::Esc => {
+                            self.show_annotate = false;
+                            self.annotation_input.clear();
+                            self.annotating_idx = None;
+                        }
+                        KeyCode::Backspace => {
+                            self.annotation_input.pop();
+                        }
+                        KeyCode::Char(c) => {
+                            self.annotation_input.push(c);
+                        }
+                        _ => {}
+                    }
+                } else if self.show_delete_confirm {
                     // Handle delete confirmation
                     match key.code {
                         KeyCode::Char('y') | KeyCode::Char('Y') => {
@@ -120,6 +145,8 @@ impl App {
             self.render_help(f);
         } else if self.show_delete_confirm {
             self.render_delete_confirm(f);
+        } else if self.show_annotate {
+            self.render_annotate(f);
         }
     }
 
@@ -330,10 +357,86 @@ impl App {
     }
 
     fn annotate_selected(&mut self) -> Result<()> {
-        // In a real implementation, this would open a text input dialog
-        // For now, we'll skip this functionality in the TUI
-        // and suggest using the CLI command instead
+        if let Some(idx) = self.list_state.selected() {
+            if let Some(cmd) = self.commands.get(idx) {
+                // Pre-fill with existing annotation if present
+                self.annotation_input = cmd.annotation.clone().unwrap_or_default();
+                self.annotating_idx = Some(idx);
+                self.show_annotate = true;
+            }
+        }
         Ok(())
+    }
+
+    fn save_annotation(&mut self) -> Result<()> {
+        if let Some(idx) = self.annotating_idx {
+            if let Some(cmd) = self.commands.get_mut(idx) {
+                if let Some(id) = cmd.id {
+                    let annotation = if self.annotation_input.is_empty() {
+                        None
+                    } else {
+                        Some(self.annotation_input.clone())
+                    };
+                    self.storage.update_annotation(id, annotation.clone())?;
+                    cmd.annotation = annotation;
+                }
+            }
+        }
+        self.show_annotate = false;
+        self.annotation_input.clear();
+        self.annotating_idx = None;
+        Ok(())
+    }
+
+    fn render_annotate(&self, f: &mut Frame) {
+        let command_preview = if let Some(idx) = self.annotating_idx {
+            if let Some(cmd) = self.commands.get(idx) {
+                if cmd.command.len() > 50 {
+                    format!("{}...", &cmd.command[..47])
+                } else {
+                    cmd.command.clone()
+                }
+            } else {
+                "unknown".to_string()
+            }
+        } else {
+            "unknown".to_string()
+        };
+
+        let text = Text::from(vec![
+            Line::from(vec![
+                Span::styled("Command: ", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(command_preview),
+            ]),
+            Line::from(""),
+            Line::from(vec![
+                Span::raw(&self.annotation_input),
+                Span::styled("█", Style::default().fg(Color::Cyan)),
+            ]),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("Enter", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(" = Save   "),
+                Span::styled("ESC", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(" = Cancel"),
+            ]),
+        ]);
+
+        let paragraph = Paragraph::new(text)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::Cyan))
+                    .title("Add Annotation")
+                    .style(Style::default().bg(Color::Black)),
+            )
+            .style(Style::default().bg(Color::Black))
+            .wrap(Wrap { trim: true });
+
+        // Dialog needs: 5 lines of text + 2 for borders = 7 lines minimum
+        let area = centered_rect_fixed_height(70, 7, f.area());
+        f.render_widget(Clear, area);
+        f.render_widget(paragraph, area);
     }
 
     fn render_delete_confirm(&self, f: &mut Frame) {

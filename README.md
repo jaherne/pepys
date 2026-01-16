@@ -18,7 +18,7 @@ A command history tool that records shell commands with rich metadata.
   - Delete commands
   - Keyboard navigation
 
-- **Annotations (to be implemented)**: Add notes to specific commands
+- **Annotations**: Add notes to specific commands
 
 - **Export Capabilities**:
   - Combine selected commands into bash scripts
@@ -91,7 +91,7 @@ Keyboard shortcuts:
 - `↑/k` - Move up
 - `↓/j` - Move down
 - `Space` - Toggle selection
-- `a` - Annotate selected command (to be implemented)
+- `a` - Annotate selected command
 - `d` - Delete selected command
 - `?` - Toggle help
 - `q` - Quit
