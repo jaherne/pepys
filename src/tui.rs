@@ -272,7 +272,8 @@ impl App {
             .style(Style::default().bg(Color::Black))
             .wrap(Wrap { trim: true });
 
-        let area = centered_rect(60, 50, f.area());
+        // Help dialog needs: 14 lines of text + 2 for borders = 16 lines minimum
+        let area = centered_rect_fixed_height(60, 16, f.area());
         f.render_widget(Clear, area); // Clear the background
         f.render_widget(paragraph, area);
     }
@@ -453,26 +454,6 @@ impl App {
         }
         Ok(())
     }
-}
-
-fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
-    let popup_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Percentage((100 - percent_y) / 2),
-            Constraint::Percentage(percent_y),
-            Constraint::Percentage((100 - percent_y) / 2),
-        ])
-        .split(r);
-
-    Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage((100 - percent_x) / 2),
-            Constraint::Percentage(percent_x),
-            Constraint::Percentage((100 - percent_x) / 2),
-        ])
-        .split(popup_layout[1])[1]
 }
 
 fn centered_rect_fixed_height(percent_x: u16, height: u16, r: Rect) -> Rect {
