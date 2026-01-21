@@ -1,4 +1,5 @@
 mod cli;
+mod config;
 mod export;
 mod models;
 mod recorder;
@@ -167,9 +168,10 @@ fn main() -> Result<()> {
         }
 
         Commands::Init { shell } => {
+            let cfg = config::Config::load()?;
             let script = match shell.as_str() {
-                "bash" => generate_bash_integration(),
-                "zsh" => generate_zsh_integration(),
+                "bash" => generate_bash_integration(&cfg),
+                "zsh" => generate_zsh_integration(&cfg),
                 _ => {
                     eprintln!("Unsupported shell: {}", shell);
                     eprintln!("Supported shells: bash, zsh");
@@ -180,6 +182,39 @@ fn main() -> Result<()> {
             println!("{}", script);
             eprintln!("\n# To enable pepys integration, add this to your shell config:");
             eprintln!("# eval \"$(pepys init --shell {})\"", shell);
+        }
+
+        Commands::Variable { name, shell } => {
+            let cfg = config::Config::load()?;
+
+            match name.as_str() {
+                "placeholder_color" => {
+                    println!("{}", cfg.placeholder_color);
+                }
+                "recording_indicator" => {
+                    let state_path = get_recording_state_path()?;
+                    if state_path.exists() {
+                        let shell = shell.unwrap_or_else(|| "bash".to_string());
+                        match shell.as_str() {
+                            "bash" => {
+                                print!("\x1b[{}m●\x1b[0m ", cfg.bash_color_code());
+                            }
+                            "zsh" => {
+                                print!("%F{{{}}}[●]%f ", cfg.zsh_color_name());
+                            }
+                            _ => {
+                                eprintln!("Unsupported shell: {}", shell);
+                                std::process::exit(1);
+                            }
+                        }
+                    }
+                    // If recording is disabled, output nothing
+                }
+                _ => {
+                    eprintln!("Unknown variable: {}", name);
+                    std::process::exit(1);
+                }
+            }
         }
     }
 

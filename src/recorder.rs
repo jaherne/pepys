@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::models::CommandRecord;
 use crate::storage::Storage;
 use anyhow::Result;
@@ -33,7 +34,7 @@ impl Recorder {
 }
 
 /// Generate shell integration script for bash
-pub fn generate_bash_integration() -> String {
+pub fn generate_bash_integration(_config: &Config) -> String {
     r#"# Pepys shell integration for bash
 # Add this to your ~/.bashrc or source it
 
@@ -55,25 +56,10 @@ _pepys_get_time_ms() {
     fi
 }
 
-# Get pepys data directory
-_pepys_get_data_dir() {
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "$HOME/Library/Application Support/pepys"
-    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        echo "${XDG_DATA_HOME:-$HOME/.local/share}/pepys"
-    else
-        echo "$HOME/.local/share/pepys"
-    fi
-}
-
 # Update prompt with recording indicator
 _pepys_update_prompt() {
-    local data_dir=$(_pepys_get_data_dir)
-    if [ -f "$data_dir/recording_enabled" ]; then
-        PS1="\[\033[0;31m\]●\[\033[0m\] $_pepys_original_ps1"
-    else
-        PS1="$_pepys_original_ps1"
-    fi
+    local indicator=$(pepys variable recording_indicator --shell bash)
+    PS1="${indicator}$_pepys_original_ps1"
 }
 
 _pepys_preexec() {
@@ -116,7 +102,7 @@ trap '_pepys_preexec "$BASH_COMMAND"' DEBUG
 }
 
 /// Generate shell integration script for zsh
-pub fn generate_zsh_integration() -> String {
+pub fn generate_zsh_integration(_config: &Config) -> String {
     r#"# Pepys shell integration for zsh
 # Add this to your ~/.zshrc or source it
 
@@ -137,23 +123,9 @@ _pepys_get_time_ms() {
     fi
 }
 
-# Get pepys data directory
-_pepys_get_data_dir() {
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "$HOME/Library/Application Support/pepys"
-    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        echo "${XDG_DATA_HOME:-$HOME/.local/share}/pepys"
-    else
-        echo "$HOME/.local/share/pepys"
-    fi
-}
-
 # Get recording indicator for prompt
 _pepys_prompt_indicator() {
-    local data_dir=$(_pepys_get_data_dir)
-    if [[ -f "$data_dir/recording_enabled" ]]; then
-        echo "%F{red}[●]%f "
-    fi
+    pepys variable recording_indicator --shell zsh
 }
 
 pepys_preexec() {

@@ -90,4 +90,14 @@ pub enum Commands {
         #[arg(short, long, default_value = "bash")]
         shell: String,
     },
+
+    /// Get a configuration variable value
+    Variable {
+        /// Name of the variable to get
+        name: String,
+
+        /// Shell type for formatted output (bash, zsh)
+        #[arg(short, long)]
+        shell: Option<String>,
+    },
 }
