@@ -63,6 +63,8 @@ _pepys_update_prompt() {
 }
 
 _pepys_preexec() {
+    # Skip internal pepys functions to avoid overwriting the actual command
+    [[ "$1" == _pepys_* ]] && return
     _pepys_command="$1"
     _pepys_start_time=$(_pepys_get_time_ms)
 }

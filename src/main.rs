@@ -197,7 +197,7 @@ fn main() -> Result<()> {
                         let shell = shell.unwrap_or_else(|| "bash".to_string());
                         match shell.as_str() {
                             "bash" => {
-                                print!("\x1b[{}m●\x1b[0m ", cfg.bash_color_code());
+                                print!("\x1b[{}m[●]\x1b[0m ", cfg.bash_color_code());
                             }
                             "zsh" => {
                                 print!("%F{{{}}}[●]%f ", cfg.zsh_color_name());
