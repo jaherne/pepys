@@ -106,13 +106,15 @@ pepys list --limit 20
 
 Export to bash script:
 ```bash
-pepys export-script 1 2 3 --output script.sh
+pepys export 1 2 3 --output script.sh --format script
 ```
 
 Export to markdown:
 ```bash
-pepys export-markdown 1 2 3 --output commands.md
+pepys export 1 2 3 --output commands.md --format markdown
 ```
+
+The `--format` flag defaults to `script` if not specified.
 
 ### View Statistics
 

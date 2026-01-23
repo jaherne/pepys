@@ -8,7 +8,7 @@ mod tui;
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use cli::{Cli, Commands};
+use cli::{Cli, Commands, ExportFormat};
 use export::Exporter;
 use recorder::{generate_bash_integration, generate_zsh_integration, Recorder};
 use storage::Storage;
@@ -105,7 +105,7 @@ fn main() -> Result<()> {
             }
         }
 
-        Commands::ExportScript { ids, output } => {
+        Commands::Export { ids, output, format } => {
             let mut records = Vec::new();
             for id in ids {
                 if let Some(record) = storage.get(id)? {
@@ -115,21 +115,10 @@ fn main() -> Result<()> {
                 }
             }
 
-            Exporter::export_bash_script(&records, &output, &storage)?;
-            println!("✓ Exported {} commands to {}", records.len(), output);
-        }
-
-        Commands::ExportMarkdown { ids, output } => {
-            let mut records = Vec::new();
-            for id in ids {
-                if let Some(record) = storage.get(id)? {
-                    records.push(record);
-                } else {
-                    eprintln!("Warning: Command #{} not found", id);
-                }
+            match format {
+                ExportFormat::Script => Exporter::export_bash_script(&records, &output, &storage)?,
+                ExportFormat::Markdown => Exporter::export_markdown(&records, &output, &storage)?,
             }
-
-            Exporter::export_markdown(&records, &output, &storage)?;
             println!("✓ Exported {} commands to {}", records.len(), output);
         }
 

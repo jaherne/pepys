@@ -1,5 +1,11 @@
 use clap::{Parser, Subcommand};
 
+#[derive(Clone, clap::ValueEnum)]
+pub enum ExportFormat {
+    Script,
+    Markdown,
+}
+
 #[derive(Parser)]
 #[command(name = "pepys")]
 #[command(version, about = "A command history tool that records shell commands with metadata", long_about = None)]
@@ -59,8 +65,8 @@ pub enum Commands {
         annotation: String,
     },
 
-    /// Export commands to a bash script
-    ExportScript {
+    /// Export commands to a file
+    Export {
         /// IDs of commands to export
         #[arg(required = true)]
         ids: Vec<i64>,
@@ -68,17 +74,10 @@ pub enum Commands {
         /// Output file path
         #[arg(short, long)]
         output: String,
-    },
 
-    /// Export commands to markdown
-    ExportMarkdown {
-        /// IDs of commands to export
-        #[arg(required = true)]
-        ids: Vec<i64>,
-
-        /// Output file path
-        #[arg(short, long)]
-        output: String,
+        /// Export format
+        #[arg(short, long, value_enum, default_value = "script")]
+        format: ExportFormat,
     },
 
     /// Show statistics about command history
