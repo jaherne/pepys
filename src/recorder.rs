@@ -6,11 +6,12 @@ use std::env;
 
 pub struct Recorder {
     storage: Storage,
+    config: Config,
 }
 
 impl Recorder {
-    pub fn new(storage: Storage) -> Self {
-        Self { storage }
+    pub fn new(storage: Storage, config: Config) -> Self {
+        Self { storage, config }
     }
 
     pub fn record(
@@ -29,7 +30,9 @@ impl Recorder {
 
         let record = CommandRecord::new(command, exit_code, duration_ms, cwd, output);
 
-        self.storage.insert(&record)
+        let id = self.storage.insert(&record)?;
+        self.storage.enforce_max_commands(self.config.max_commands)?;
+        Ok(id)
     }
 }
 

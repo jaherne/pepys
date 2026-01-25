@@ -7,16 +7,24 @@ use std::path::PathBuf;
 pub struct Config {
     #[serde(default = "default_placeholder_color")]
     pub placeholder_color: String,
+
+    #[serde(default = "default_max_commands")]
+    pub max_commands: usize,
 }
 
 fn default_placeholder_color() -> String {
     "red".to_string()
 }
 
+fn default_max_commands() -> usize {
+    10000
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
             placeholder_color: default_placeholder_color(),
+            max_commands: default_max_commands(),
         }
     }
 }

@@ -48,7 +48,8 @@ fn main() -> Result<()> {
             working_directory,
             output,
         } => {
-            let recorder = Recorder::new(storage);
+            let cfg = config::Config::load()?;
+            let recorder = Recorder::new(storage, cfg);
             recorder.record(command, exit_code, duration_ms, working_directory, output)?;
         }
 

@@ -177,6 +177,23 @@ impl Storage {
         Ok(count)
     }
 
+    /// Enforces max command limit by deleting oldest commands
+    pub fn enforce_max_commands(&self, max: usize) -> Result<usize> {
+        let count = self.count()?;
+        if count <= max {
+            return Ok(0);
+        }
+
+        let to_delete = count - max;
+        self.conn.execute(
+            "DELETE FROM commands WHERE id IN (
+                SELECT id FROM commands ORDER BY timestamp ASC LIMIT ?1
+            )",
+            params![to_delete],
+        )?;
+        Ok(to_delete)
+    }
+
     /// Helper function to convert a database row to a CommandRecord
     fn row_to_record(row: &rusqlite::Row) -> rusqlite::Result<CommandRecord> {
         let timestamp_str: String = row.get(4)?;
