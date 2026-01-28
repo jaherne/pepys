@@ -36,20 +36,10 @@ sudo cp target/release/pepys /usr/local/bin/
 
 ## Setup
 
-### Bash
-
-Add to your `~/.bashrc`:
-
-```bash
-eval "$(pepys init --shell bash)"
-```
-
-### Zsh
-
 Add to your `~/.zshrc`:
 
 ```bash
-eval "$(pepys init --shell zsh)"
+eval "$(pepys init)"
 ```
 
 ## Usage

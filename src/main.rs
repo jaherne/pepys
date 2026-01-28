@@ -10,7 +10,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use cli::{Cli, Commands, ExportFormat};
 use export::Exporter;
-use recorder::{generate_bash_integration, generate_zsh_integration, Recorder};
+use recorder::{generate_zsh_integration, Recorder};
 use storage::Storage;
 use std::path::PathBuf;
 
@@ -160,24 +160,16 @@ fn main() -> Result<()> {
             }
         }
 
-        Commands::Init { shell } => {
+        Commands::Init => {
             let cfg = config::Config::load()?;
-            let script = match shell.as_str() {
-                "bash" => generate_bash_integration(&cfg),
-                "zsh" => generate_zsh_integration(&cfg),
-                _ => {
-                    eprintln!("Unsupported shell: {}", shell);
-                    eprintln!("Supported shells: bash, zsh");
-                    std::process::exit(1);
-                }
-            };
+            let script = generate_zsh_integration(&cfg);
 
             println!("{}", script);
-            eprintln!("\n# To enable pepys integration, add this to your shell config:");
-            eprintln!("# eval \"$(pepys init --shell {})\"", shell);
+            eprintln!("\n# To enable pepys integration, add this to your ~/.zshrc:");
+            eprintln!("# eval \"$(pepys init)\"");
         }
 
-        Commands::Variable { name, shell } => {
+        Commands::Variable { name } => {
             let cfg = config::Config::load()?;
 
             match name.as_str() {
@@ -187,19 +179,7 @@ fn main() -> Result<()> {
                 "recording_indicator" => {
                     let state_path = get_recording_state_path()?;
                     if state_path.exists() {
-                        let shell = shell.unwrap_or_else(|| "bash".to_string());
-                        match shell.as_str() {
-                            "bash" => {
-                                print!("\x1b[{}m[●]\x1b[0m ", cfg.bash_color_code());
-                            }
-                            "zsh" => {
-                                print!("%F{{{}}}[●]%f ", cfg.zsh_color_name());
-                            }
-                            _ => {
-                                eprintln!("Unsupported shell: {}", shell);
-                                std::process::exit(1);
-                            }
-                        }
+                        print!("%F{{{}}}[●]%f ", cfg.zsh_color_name());
                     }
                     // If recording is disabled, output nothing
                 }

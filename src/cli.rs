@@ -84,19 +84,11 @@ pub enum Commands {
     Stats,
 
     /// Initialize shell integration (prints shell script to stdout)
-    Init {
-        /// Shell type (bash, zsh)
-        #[arg(short, long, default_value = "bash")]
-        shell: String,
-    },
+    Init,
 
     /// Get a configuration variable value
     Variable {
         /// Name of the variable to get
         name: String,
-
-        /// Shell type for formatted output (bash, zsh)
-        #[arg(short, long)]
-        shell: Option<String>,
     },
 }

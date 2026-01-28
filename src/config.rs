@@ -63,21 +63,6 @@ impl Config {
         Ok(config_dir.join("config.toml"))
     }
 
-    /// Convert the placeholder color to a bash ANSI escape sequence.
-    pub fn bash_color_code(&self) -> &str {
-        match self.placeholder_color.to_lowercase().as_str() {
-            "black" => "0;30",
-            "red" => "0;31",
-            "green" => "0;32",
-            "yellow" => "0;33",
-            "blue" => "0;34",
-            "magenta" => "0;35",
-            "cyan" => "0;36",
-            "white" => "0;37",
-            _ => "0;31", // default to red for unknown colors
-        }
-    }
-
     /// Convert the placeholder color to a zsh color name.
     /// Zsh supports these color names natively.
     pub fn zsh_color_name(&self) -> &str {
