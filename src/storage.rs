@@ -2,6 +2,7 @@ use crate::models::CommandRecord;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection};
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 pub struct Storage {
@@ -58,14 +59,25 @@ impl Storage {
             [],
         )?;
 
+        // Migration: Add env_vars column if it doesn't exist
+        self.conn
+            .execute("ALTER TABLE commands ADD COLUMN env_vars TEXT", [])
+            .ok(); // Ignore error if column already exists
+
         Ok(())
     }
 
     /// Insert a new command record
     pub fn insert(&self, record: &CommandRecord) -> Result<i64> {
+        let env_vars_json = if record.env_vars.is_empty() {
+            None
+        } else {
+            Some(serde_json::to_string(&record.env_vars)?)
+        };
+
         self.conn.execute(
-            "INSERT INTO commands (command, exit_code, duration_ms, timestamp, working_directory, output)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO commands (command, exit_code, duration_ms, timestamp, working_directory, output, env_vars)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 record.command,
                 record.exit_code,
@@ -73,6 +85,7 @@ impl Storage {
                 record.timestamp.to_rfc3339(),
                 record.working_directory,
                 record.output,
+                env_vars_json,
             ],
         )?;
 
@@ -82,7 +95,7 @@ impl Storage {
     /// Get a command record by ID
     pub fn get(&self, id: i64) -> Result<Option<CommandRecord>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, command, exit_code, duration_ms, timestamp, working_directory, output
+            "SELECT id, command, exit_code, duration_ms, timestamp, working_directory, output, env_vars
              FROM commands WHERE id = ?1",
         )?;
 
@@ -98,7 +111,7 @@ impl Storage {
     /// Get all command records, ordered by timestamp (most recent first)
     pub fn get_all(&self) -> Result<Vec<CommandRecord>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, command, exit_code, duration_ms, timestamp, working_directory, output
+            "SELECT id, command, exit_code, duration_ms, timestamp, working_directory, output, env_vars
              FROM commands ORDER BY timestamp DESC",
         )?;
 
@@ -115,7 +128,7 @@ impl Storage {
     /// Get the most recent N command records
     pub fn get_recent(&self, limit: usize) -> Result<Vec<CommandRecord>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, command, exit_code, duration_ms, timestamp, working_directory, output
+            "SELECT id, command, exit_code, duration_ms, timestamp, working_directory, output, env_vars
              FROM commands ORDER BY timestamp DESC LIMIT ?1",
         )?;
 
@@ -201,6 +214,11 @@ impl Storage {
             .map(|dt| dt.with_timezone(&Utc))
             .unwrap_or_else(|_| Utc::now());
 
+        let env_vars_json: Option<String> = row.get(7)?;
+        let env_vars: HashMap<String, String> = env_vars_json
+            .map(|s| serde_json::from_str(&s).unwrap_or_default())
+            .unwrap_or_default();
+
         Ok(CommandRecord {
             id: Some(row.get(0)?),
             command: row.get(1)?,
@@ -209,6 +227,7 @@ impl Storage {
             timestamp,
             working_directory: row.get(5)?,
             output: row.get(6)?,
+            env_vars,
         })
     }
 }
@@ -230,6 +249,7 @@ mod tests {
             150,
             "/tmp".to_string(),
             Some("output".to_string()),
+            HashMap::new(),
         );
 
         let id = storage.insert(&record)?;
@@ -261,6 +281,63 @@ mod tests {
         // Delete
         storage.delete(id)?;
         assert_eq!(storage.count()?, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_env_vars_roundtrip() -> Result<()> {
+        let temp_file = NamedTempFile::new()?;
+        let storage = Storage::new(temp_file.path().to_path_buf())?;
+
+        // Insert a record with env vars
+        let mut env_vars = HashMap::new();
+        env_vars.insert("VIRTUAL_ENV".to_string(), "/path/to/venv".to_string());
+        env_vars.insert("NODE_ENV".to_string(), "development".to_string());
+
+        let record = CommandRecord::new(
+            "npm test".to_string(),
+            0,
+            500,
+            "/project".to_string(),
+            None,
+            env_vars,
+        );
+
+        let id = storage.insert(&record)?;
+        let retrieved = storage.get(id)?.unwrap();
+
+        assert_eq!(retrieved.env_vars.len(), 2);
+        assert_eq!(
+            retrieved.env_vars.get("VIRTUAL_ENV"),
+            Some(&"/path/to/venv".to_string())
+        );
+        assert_eq!(
+            retrieved.env_vars.get("NODE_ENV"),
+            Some(&"development".to_string())
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_empty_env_vars() -> Result<()> {
+        let temp_file = NamedTempFile::new()?;
+        let storage = Storage::new(temp_file.path().to_path_buf())?;
+
+        let record = CommandRecord::new(
+            "echo hello".to_string(),
+            0,
+            100,
+            "/tmp".to_string(),
+            None,
+            HashMap::new(),
+        );
+
+        let id = storage.insert(&record)?;
+        let retrieved = storage.get(id)?.unwrap();
+
+        assert!(retrieved.env_vars.is_empty());
 
         Ok(())
     }

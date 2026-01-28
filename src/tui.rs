@@ -244,6 +244,13 @@ impl App {
                     ]),
                 ];
 
+                if let Some(env_display) = cmd.env_vars_display() {
+                    lines.push(Line::from(vec![
+                        Span::styled("Environment: ", Style::default().add_modifier(Modifier::BOLD)),
+                        Span::raw(env_display),
+                    ]));
+                }
+
                 if let Ok(Some(annotation)) = self.storage.get_annotation_for_command(&cmd.command) {
                     lines.push(Line::from(""));
                     lines.push(Line::from(vec![Span::styled(

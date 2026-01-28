@@ -10,6 +10,7 @@ A command history tool that records shell commands with rich metadata.
   - Exit status
   - Execution duration
   - Working directory
+  - Environment variables (configurable)
   - Optional output capture
 
 - **Interactive Browser**: TUI for browsing command history
@@ -71,6 +72,23 @@ Note that this can include sensitive info, such as if you run `cat /etc/shadow`.
 
 Output recording is **disabled by default**.
 
+### Environment Variable Capture
+
+Pepys can capture specified environment variables with each command. This is useful for tracking context like virtual environments, AWS profiles, or Node.js environments.
+
+Create or edit `~/.pepys/config.toml`:
+
+```toml
+capture_env_vars = ["VIRTUAL_ENV", "AWS_PROFILE", "NODE_ENV"]
+```
+
+Captured environment variables are displayed in:
+- The interactive browser's details pane
+- The `pepys list` output
+- Exported markdown and bash scripts
+
+**Limitation:** Only environment variables set in the shell environment are captured (e.g., via `export` or by activating a virtual environment). Inline variable assignments like `FOO=bar command` are not captured as structured data because they only exist in the subprocess environment. However, they remain visible in the command text itself.
+
 ### Manual Command Entry
 
 You can manually add a command to history:
@@ -120,6 +138,19 @@ The `--format` flag defaults to `script` if not specified.
 
 ```bash
 pepys stats
+```
+
+## Configuration
+
+Pepys can be configured via `~/.pepys/config.toml`. All settings are optional with sensible defaults.
+
+```toml
+# Maximum number of commands to store (default: 10000)
+# Oldest commands are deleted when limit is exceeded
+max_commands = 10000
+
+# Environment variables to capture with each command (default: none)
+capture_env_vars = ["VIRTUAL_ENV", "AWS_PROFILE", "NODE_ENV"]
 ```
 
 ## Data Storage

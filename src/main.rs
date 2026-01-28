@@ -90,6 +90,9 @@ fn main() -> Result<()> {
                     cmd.duration_human_readable(),
                     cmd.working_directory
                 );
+                if let Some(env_display) = cmd.env_vars_display() {
+                    println!("    Env: {}", env_display);
+                }
                 if let Some(annotation) = storage.get_annotation_for_command(&cmd.command)? {
                     println!("    Note: {}", annotation);
                 }

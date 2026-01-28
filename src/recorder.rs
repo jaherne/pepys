@@ -2,6 +2,7 @@ use crate::config::Config;
 use crate::models::CommandRecord;
 use crate::storage::Storage;
 use anyhow::Result;
+use std::collections::HashMap;
 use std::env;
 
 pub struct Recorder {
@@ -28,11 +29,21 @@ impl Recorder {
                 .unwrap_or_else(|_| String::from("unknown"))
         });
 
-        let record = CommandRecord::new(command, exit_code, duration_ms, cwd, output);
+        let env_vars = self.capture_env_vars();
+        let record = CommandRecord::new(command, exit_code, duration_ms, cwd, output, env_vars);
 
         let id = self.storage.insert(&record)?;
         self.storage.enforce_max_commands(self.config.max_commands)?;
         Ok(id)
+    }
+
+    /// Capture environment variables specified in the config from the current process
+    fn capture_env_vars(&self) -> HashMap<String, String> {
+        self.config
+            .capture_env_vars
+            .iter()
+            .filter_map(|name| env::var(name).ok().map(|val| (name.clone(), val)))
+            .collect()
     }
 }
 

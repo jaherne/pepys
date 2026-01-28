@@ -10,6 +10,9 @@ pub struct Config {
 
     #[serde(default = "default_max_commands")]
     pub max_commands: usize,
+
+    #[serde(default = "default_capture_env_vars")]
+    pub capture_env_vars: Vec<String>,
 }
 
 fn default_placeholder_color() -> String {
@@ -20,11 +23,16 @@ fn default_max_commands() -> usize {
     10000
 }
 
+fn default_capture_env_vars() -> Vec<String> {
+    Vec::new()
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
             placeholder_color: default_placeholder_color(),
             max_commands: default_max_commands(),
+            capture_env_vars: default_capture_env_vars(),
         }
     }
 }

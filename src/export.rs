@@ -31,6 +31,9 @@ impl Exporter {
                 record.duration_human_readable(),
                 record.exit_code
             )?;
+            if let Some(env_display) = record.env_vars_display() {
+                writeln!(file, "# Env: {}", env_display)?;
+            }
             writeln!(file, "{}", record.command)?;
             writeln!(file)?;
         }
@@ -66,6 +69,16 @@ impl Exporter {
             writeln!(file, "**Timestamp:** {}", record.timestamp)?;
             writeln!(file, "**Directory:** `{}`", record.working_directory)?;
 
+            if !record.env_vars.is_empty() {
+                writeln!(file)?;
+                writeln!(file, "**Environment:**")?;
+                let mut pairs: Vec<_> = record.env_vars.iter().collect();
+                pairs.sort_by_key(|(k, _)| *k);
+                for (name, value) in pairs {
+                    writeln!(file, "- `{}`: `{}`", name, value)?;
+                }
+            }
+
             if let Some(annotation) = storage.get_annotation_for_command(&record.command)? {
                 writeln!(file)?;
                 writeln!(file, "**Note:**")?;
@@ -92,6 +105,7 @@ impl Exporter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
     use tempfile::NamedTempFile;
 
     #[test]
@@ -100,8 +114,8 @@ mod tests {
         let storage = Storage::new(db_file.path().to_path_buf())?;
 
         let records = vec![
-            CommandRecord::new("echo hello".to_string(), 0, 100, "/tmp".to_string(), None),
-            CommandRecord::new("ls -la".to_string(), 0, 150, "/tmp".to_string(), None),
+            CommandRecord::new("echo hello".to_string(), 0, 100, "/tmp".to_string(), None, HashMap::new()),
+            CommandRecord::new("ls -la".to_string(), 0, 150, "/tmp".to_string(), None, HashMap::new()),
         ];
 
         // Add an annotation for ls -la
@@ -130,6 +144,7 @@ mod tests {
             100,
             "/tmp".to_string(),
             Some("test output".to_string()),
+            HashMap::new(),
         )];
 
         let temp_file = NamedTempFile::new()?;
@@ -139,6 +154,43 @@ mod tests {
         assert!(content.contains("# Command History Export"));
         assert!(content.contains("echo test"));
         assert!(content.contains("test output"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_export_with_env_vars() -> Result<()> {
+        let db_file = NamedTempFile::new()?;
+        let storage = Storage::new(db_file.path().to_path_buf())?;
+
+        let mut env_vars = HashMap::new();
+        env_vars.insert("NODE_ENV".to_string(), "test".to_string());
+        env_vars.insert("AWS_PROFILE".to_string(), "dev".to_string());
+
+        let records = vec![CommandRecord::new(
+            "npm test".to_string(),
+            0,
+            500,
+            "/project".to_string(),
+            None,
+            env_vars,
+        )];
+
+        // Test bash script export
+        let bash_file = NamedTempFile::new()?;
+        Exporter::export_bash_script(&records, bash_file.path().to_str().unwrap(), &storage)?;
+        let bash_content = std::fs::read_to_string(bash_file.path())?;
+        assert!(bash_content.contains("# Env:"));
+        assert!(bash_content.contains("NODE_ENV=test"));
+        assert!(bash_content.contains("AWS_PROFILE=dev"));
+
+        // Test markdown export
+        let md_file = NamedTempFile::new()?;
+        Exporter::export_markdown(&records, md_file.path().to_str().unwrap(), &storage)?;
+        let md_content = std::fs::read_to_string(md_file.path())?;
+        assert!(md_content.contains("**Environment:**"));
+        assert!(md_content.contains("`NODE_ENV`: `test`"));
+        assert!(md_content.contains("`AWS_PROFILE`: `dev`"));
 
         Ok(())
     }
