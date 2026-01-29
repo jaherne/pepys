@@ -165,8 +165,6 @@ fn main() -> Result<()> {
             let script = generate_zsh_integration(&cfg);
 
             println!("{}", script);
-            eprintln!("\n# To enable pepys integration, add this to your ~/.zshrc:");
-            eprintln!("# eval \"$(pepys init)\"");
         }
 
         Commands::Variable { name } => {
