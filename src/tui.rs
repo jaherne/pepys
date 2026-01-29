@@ -213,10 +213,10 @@ impl App {
         f.render_stateful_widget(list, area, &mut self.list_state);
     }
 
-    fn render_details(&self, f: &mut Frame, area: Rect) {
+    fn render_details(&mut self, f: &mut Frame, area: Rect) {
         let selected = self.list_state.selected();
 
-        let text = if let Some(idx) = selected {
+        let (text, content_height) = if let Some(idx) = selected {
             if let Some(cmd) = self.commands.get(idx) {
                 let mut lines = vec![
                     Line::from(vec![
@@ -264,13 +264,18 @@ impl App {
                     lines.push(Line::from(annotation));
                 }
 
-                Text::from(lines)
+                let height = lines.len();
+                (Text::from(lines), height)
             } else {
-                Text::from("No command selected")
+                (Text::from("No command selected"), 1)
             }
         } else {
-            Text::from("No command selected")
+            (Text::from("No command selected"), 1)
         };
+
+        // Cap scroll so the last line can reach the top of the view
+        let max_scroll = content_height.saturating_sub(1) as u16;
+        self.details_scroll = self.details_scroll.min(max_scroll);
 
         let paragraph = Paragraph::new(text)
             .block(Block::default().borders(Borders::ALL).title("Details"))
@@ -329,6 +334,7 @@ impl App {
             None => 0,
         };
         self.list_state.select(Some(i));
+        self.details_scroll = 0;
     }
 
     fn previous(&mut self) {
@@ -343,6 +349,7 @@ impl App {
             None => 0,
         };
         self.list_state.select(Some(i));
+        self.details_scroll = 0;
     }
 
     fn scroll_details_down(&mut self) {
