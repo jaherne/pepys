@@ -296,6 +296,8 @@ impl App {
             Line::from("Keyboard Shortcuts:"),
             Line::from("  ↑/k       - Move up"),
             Line::from("  ↓/j       - Move down"),
+            Line::from("  Shift-↑/K - Scroll details up"),
+            Line::from("  Shift-↓/J - Scroll details down"),
             Line::from("  Space     - Toggle selection"),
             Line::from("  Ctrl-A    - Select all commands"),
             Line::from("  a         - Annotate selected command"),
