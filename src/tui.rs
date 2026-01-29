@@ -26,6 +26,7 @@ pub struct App {
     show_annotate: bool,
     annotation_input: String,
     annotating_idx: Option<usize>,
+    details_scroll: u16,
 }
 
 impl App {
@@ -46,6 +47,7 @@ impl App {
             show_annotate: false,
             annotation_input: String::new(),
             annotating_idx: None,
+            details_scroll: 0,
         })
     }
 
@@ -112,7 +114,9 @@ impl App {
                     match key.code {
                         KeyCode::Char('q') => return Ok(()),
                         KeyCode::Char('?') => self.show_help = !self.show_help,
+                        KeyCode::Down | KeyCode::Char('J') if key.modifiers.contains(KeyModifiers::SHIFT) => self.scroll_details_down(),
                         KeyCode::Down | KeyCode::Char('j') => self.next(),
+                        KeyCode::Up | KeyCode::Char('K') if key.modifiers.contains(KeyModifiers::SHIFT) => self.scroll_details_up(),
                         KeyCode::Up | KeyCode::Char('k') => self.previous(),
                         KeyCode::Char(' ') => self.toggle_selection(),
                         KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -270,7 +274,8 @@ impl App {
 
         let paragraph = Paragraph::new(text)
             .block(Block::default().borders(Borders::ALL).title("Details"))
-            .wrap(Wrap { trim: true });
+            .wrap(Wrap { trim: true })
+            .scroll((self.details_scroll, 0));
 
         f.render_widget(paragraph, area);
     }
@@ -338,6 +343,16 @@ impl App {
             None => 0,
         };
         self.list_state.select(Some(i));
+    }
+
+    fn scroll_details_down(&mut self) {
+        self.details_scroll = self.details_scroll + 1
+    }
+
+    fn scroll_details_up(&mut self) {
+        if self.details_scroll > 0 {
+            self.details_scroll = self.details_scroll - 1
+        }
     }
 
     fn toggle_selection(&mut self) {
